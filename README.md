@@ -8,7 +8,9 @@ cd PreTrained-TTN_VQC
 
 # Installation
 
-The main depencies include *pytorch* and *torchquantum*. Besides we need our implemeted package of TTN:
+The main depencies include *pytorch* and *torchquantum*. Moreover, we need the following packages:
+
+## 1. Our implemented package of TTN:
 ```
 git clone https://github.com/uwjunqi/Pytorch-Tensor-Train-Network.git
 cd Pytorch-Tensor-Train-Network
