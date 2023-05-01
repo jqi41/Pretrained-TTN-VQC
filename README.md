@@ -17,4 +17,9 @@ cd Pytorch-Tensor-Train-Network
 python setup.py install
 ```
 
+## 2. Torch Quantum 
+```
+pip3 install torchquantum
+```
+
 
