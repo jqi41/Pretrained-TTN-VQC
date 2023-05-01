@@ -10,31 +10,31 @@ cd PreTrained-TTN_VQC
 
 The main depencies include *pytorch* and *torchquantum*. Moreover, we need the following packages:
 
-### 1. Our implemented package of TTN:
+### Our implemented package of TTN:
 ```
 git clone https://github.com/uwjunqi/Pytorch-Tensor-Train-Network.git
 cd Pytorch-Tensor-Train-Network
 python setup.py install
 ```
 
-### 2. Torch Quantum 
+### Torch Quantum 
 ```
 pip3 install torchquantum
 ```
 
 ## Experimental simulations
 
-### 1. Running TTN-VQC
+### Running TTN-VQC
 ```
 python vqc_classifier.py
 ```
 
-### 2. Running Pre+TTN-VQC
+### Running Pre+TTN-VQC
 ```
 python vqc_finetune.py
 ```
 
-### 3. Running PCA-VQC
+### Running PCA-VQC
 ```
 python pca_vqc_classifier.py
 ```
