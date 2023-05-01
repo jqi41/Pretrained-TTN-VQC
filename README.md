@@ -22,4 +22,19 @@ python setup.py install
 pip3 install torchquantum
 ```
 
+# Experiments for evaluating representation power
 
+## 1. Running TTN-VQC
+```
+python vqc_classifier.py
+```
+
+## 2. Running Pre+TTN-VQC
+```
+python vqc_finetune.py
+```
+
+## 3. Running PCA-VQC
+```
+python pca_vqc_classifier.py
+```
