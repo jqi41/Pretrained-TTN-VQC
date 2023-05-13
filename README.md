@@ -1,6 +1,6 @@
 # Pre+TTN_VQC (Pretrained Tensor-Train Network + Variational Quantum Circuit)
 
-The package provides an implementation of Pre+TTN-VQC to corroborate our theoretical work.
+The package provides an implementation of Pre+TTN-VQC to corroborate our theoretical work on VQC in Refs. [1] and [2].
 ```
 git clone https://github.com/uwjunqi/PreTrained-TTN_VQC
 cd PreTrained-TTN_VQC
