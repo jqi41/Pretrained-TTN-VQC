@@ -13,7 +13,6 @@ import torch
 # Torch Quantum
 import torchquantum as tq
 import torchquantum.functional as tqf
-from torchquantum.functional import func_name_dict 
 
 
 class VQC(tq.QuantumModule):
@@ -52,7 +51,7 @@ class VQC(tq.QuantumModule):
             for i in range(self.n_wires):
                 self.params_rx_dct[i + k*self.n_wires] = tq.RX(has_params=True, trainable=True)
                 self.params_ry_dct[i + k*self.n_wires] = tq.RY(has_params=True, trainable=True)
-                self.params_rz_dct[i + k*self.n_wires] = tq.RY(has_params=True, trainable=True)
+                self.params_rz_dct[i + k*self.n_wires] = tq.RZ(has_params=True, trainable=True)
         # The observables are Hermitian operator based on Pauli-Z 
         self.measure = tq.MeasureAll(tq.PauliZ)
         
@@ -70,7 +69,6 @@ class VQC(tq.QuantumModule):
                 to all the tqf functions, such as tqf.hadamard below
         """
         self.q_device = q_device
-        self.q_device.reset_states(x.shape[0])
         self.encoder(self.q_device, x)
             
         for k in range(self.n_qlayers):
@@ -90,42 +88,20 @@ class VQC(tq.QuantumModule):
         return (self.measure(self.q_device))
     
     
-class FF_VQC(tq.QuantumModule):
-    """Training a VQC ansatz by using Forward-Forward algorithm
+class FF_VQC(VQC):
+    """Training a VQC ansatz by using the Forward-Forward optimization algorithm
     """
     def __init__(self,
                  n_wires: int,
-                 n_qlayers: int,
                  optimizer: torch.optim,
                  layer_optim_learning_rate: float,
                  threshold: float,
                  loss_fn: Callable):
-        super().__init__()
-        self.n_wires = n_wires 
-        self.n_qlayers = n_qlayers
-        self.optimizer = optimizer(self.parameters(), lr=layer_optim_learning_rate)
+        super(FF_VQC, self).__init__(n_wires)
         self.threshold = threshold 
+        self.optimizer = optimizer
         self.loss_fn = loss_fn
-            
-        # Setting up tensor product encoder
-        enc_cnt = list()
-        for i in range(self.n_wires):
-            cnt = {'input_idx': [i], 'func': 'ry', 'wires': [i]}
-            enc_cnt.append(cnt)
-        self.encoder = tq.GeneralEncoder(enc_cnt)
-            
-        # We create trainable model parameters, which are stored in dict 
-        self.params_rx_dct = {}
-        self.params_ry_dct = {}
-        self.params_rz_dct = {}
-                
-        for k in range(self.n_qlayers):
-            for i in range(self.n_wires):
-                self.params_rx_dct[i + k*self.n_wires] = tq.RX(has_params=True, trainable=True)
-                self.params_ry_dct[i + k*self.n_wires] = tq.RY(has_params=True, trainable=True)
-                self.params_rz_dct[i + k*self.n_wires] = tq.RY(has_params=True, trainable=True)
-        # The observables are Hermitian operator based on Pauli-Z 
-        self.measure = tq.MeasureAll(tq.PauliZ)
+        
             
     @tq.static_support
     def forward(self, 
@@ -146,19 +122,18 @@ class FF_VQC(tq.QuantumModule):
         self.q_device = q_device 
         self.encoder(self.q_device, x)
             
-        for k in range(self.n_qlayers):
-            for i in range(self.n_wires):
-                self.params_rx_dct[i + k*self.n_wires](self.q_device, wires=i)
-                self.params_ry_dct[i + k*self.n_wires](self.q_device, wires=i)
-                self.params_rz_dct[i + k*self.n_wires](self.q_device, wires=i)
+        for i in range(self.n_wires):
+            self.params_rx_dct[i](self.q_device, wires=i)
+            self.params_ry_dct[i](self.q_device, wires=i)
+            self.params_rz_dct[i](self.q_device, wires=i)
                 
-            for i in range(self.n_wires):
-                if i == self.n_wires-1:
-                    tqf.cnot(self.q_device, wires=[i, 0], static=self.static_mode,
+        for i in range(self.n_wires):
+            if i == self.n_wires-1:
+                tqf.cnot(self.q_device, wires=[i, 0], static=self.static_mode,
                              parent_graph=self.graph)
-                else:
-                    tqf.cnot(self.q_device, wires=[i, i+1], static=self.static_mode,
-                             parent_graph=self.graph)
+            else:
+                tqf.cnot(self.q_device, wires=[i, i+1], static=self.static_mode,
+                         parent_graph=self.graph)
                 
         return (self.measure(self.q_device))
             
@@ -175,15 +150,16 @@ class FF_VQC(tq.QuantumModule):
         returns:
             Tuple[torch.Tensor, torch.Tensor, int]: batch of positive and negative predictions and loss value
         """
-        X_pos_out = self.forward(X_pos)
-        X_neg_out = self.forward(X_neg)
+        X_pos_out = self.forward(X_pos, self.q_device)
+        X_neg_out = self.forward(X_neg, self.q_device)
             
         loss = self.loss_fn(X_pos_out, X_neg_out, self.threshold)
-        self.optimizer.zero_grad()
+        opt = self.optimizer(self.parameters(), lr=self.layer_optim_learning_rate)
+        opt.zero_grad()
         loss.backward()
-        self.optimizer.step()
+        opt.step()
             
         if before:
             return X_pos_out.detach(), X_neg_out.detach(), loss.item()
         else:
-            return self.forward(X_pos).detach(), self.forward()
+            return self.forward(X_pos).detach(), self.forward().detach(), loss.item()
