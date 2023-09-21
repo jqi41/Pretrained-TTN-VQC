@@ -43,15 +43,15 @@ class VQC(tq.QuantumModule):
         self.encoder = tq.GeneralEncoder(enc_cnt)
         
         # We create trainable model parameters, which are stored in dict 
-        self.params_rx_dct = {}
-        self.params_ry_dct = {}
-        self.params_rz_dct = {}
+        self.params_rx_dct = tq.QuantumModuleDict()
+        self.params_ry_dct = tq.QuantumModuleDict()
+        self.params_rz_dct = tq.QuantumModuleDict()
             
         for k in range(self.n_qlayers):
             for i in range(self.n_wires):
-                self.params_rx_dct[i + k*self.n_wires] = tq.RX(has_params=True, trainable=True)
-                self.params_ry_dct[i + k*self.n_wires] = tq.RY(has_params=True, trainable=True)
-                self.params_rz_dct[i + k*self.n_wires] = tq.RZ(has_params=True, trainable=True)
+                self.params_rx_dct[str(i + k*self.n_wires)] = tq.RX(has_params=True, trainable=True)
+                self.params_ry_dct[str(i + k*self.n_wires)] = tq.RY(has_params=True, trainable=True)
+                self.params_rz_dct[str(i + k*self.n_wires)] = tq.RZ(has_params=True, trainable=True)
         # The observables are Hermitian operator based on Pauli-Z 
         self.measure = tq.MeasureAll(tq.PauliZ)
         
@@ -73,9 +73,9 @@ class VQC(tq.QuantumModule):
             
         for k in range(self.n_qlayers):
             for i in range(self.n_wires):
-                self.params_rx_dct[i + k*self.n_wires](self.q_device, wires=i)
-                self.params_ry_dct[i + k*self.n_wires](self.q_device, wires=i)
-                self.params_rz_dct[i + k*self.n_wires](self.q_device, wires=i)
+                self.params_rx_dct[str(i + k*self.n_wires)](self.q_device, wires=i)
+                self.params_ry_dct[str(i + k*self.n_wires)](self.q_device, wires=i)
+                self.params_rz_dct[str(i + k*self.n_wires)](self.q_device, wires=i)
             
             for i in range(self.n_wires):
                 if i == self.n_wires-1:
@@ -88,19 +88,43 @@ class VQC(tq.QuantumModule):
         return (self.measure(self.q_device))
     
     
-class FF_VQC(VQC):
-    """Training a VQC ansatz by using the Forward-Forward optimization algorithm
+class FF_VQC(tq.QuantumModule):
+    """Training a VQC ansatz by using Forward-Forward algorithm
     """
     def __init__(self,
                  n_wires: int,
-                 optimizer: torch.optim,
+                 optimizer: torch.optim.Adam,
                  layer_optim_learning_rate: float,
                  threshold: float,
                  loss_fn: Callable):
-        super(FF_VQC, self).__init__(n_wires)
+        super(FF_VQC, self).__init__()
+        self.n_wires = n_wires 
         self.threshold = threshold 
-        self.optimizer = optimizer
         self.loss_fn = loss_fn
+        self.dev = tq.QuantumDevice(n_wires=n_wires)
+            
+        # Setting up tensor product encoder
+        enc_cnt = list()
+        for i in range(self.n_wires):
+            cnt = {'input_idx': [i], 'func': 'ry', 'wires': [i]}
+            enc_cnt.append(cnt)
+        self.encoder = tq.GeneralEncoder(enc_cnt)
+            
+        # We create trainable model parameters, which are stored in dict 
+        self.params_rx_dct = tq.QuantumModuleDict()
+        self.params_ry_dct = tq.QuantumModuleDict()
+        self.params_rz_dct = tq.QuantumModuleDict()
+                
+        for i in range(self.n_wires):
+            self.params_rx_dct[str(i)] = tq.RX(has_params=True, trainable=True)
+            self.params_ry_dct[str(i)] = tq.RY(has_params=True, trainable=True)
+            self.params_rz_dct[str(i)] = tq.RZ(has_params=True, trainable=True)
+            
+        self.optimizer = optimizer(self.parameters(), lr=layer_optim_learning_rate)
+        self.layer_optim_learning_rate = layer_optim_learning_rate 
+        
+        # The observables are Hermitian operator based on Pauli-Z 
+        self.measure = tq.MeasureAll(tq.PauliZ)
         
             
     @tq.static_support
@@ -118,19 +142,18 @@ class FF_VQC(VQC):
         """
         # normalize the input
         x = x / (x.norm(2, 1, keepdim=True) + 1e-8) 
-            
-        self.q_device = q_device 
+        self.q_device = q_device
         self.encoder(self.q_device, x)
             
         for i in range(self.n_wires):
-            self.params_rx_dct[i](self.q_device, wires=i)
-            self.params_ry_dct[i](self.q_device, wires=i)
-            self.params_rz_dct[i](self.q_device, wires=i)
+            self.params_rx_dct[str(i)](self.q_device, wires=i)
+            self.params_ry_dct[str(i)](self.q_device, wires=i)
+            self.params_rz_dct[str(i)](self.q_device, wires=i)
                 
         for i in range(self.n_wires):
             if i == self.n_wires-1:
                 tqf.cnot(self.q_device, wires=[i, 0], static=self.static_mode,
-                             parent_graph=self.graph)
+                         parent_graph=self.graph)
             else:
                 tqf.cnot(self.q_device, wires=[i, i+1], static=self.static_mode,
                          parent_graph=self.graph)
@@ -150,16 +173,20 @@ class FF_VQC(VQC):
         returns:
             Tuple[torch.Tensor, torch.Tensor, int]: batch of positive and negative predictions and loss value
         """
-        X_pos_out = self.forward(X_pos, self.q_device)
-        X_neg_out = self.forward(X_neg, self.q_device)
-            
+        X_pos_out = self.forward(X_pos, self.dev)
+        X_neg_out = self.forward(X_neg, self.dev)
+                    
         loss = self.loss_fn(X_pos_out, X_neg_out, self.threshold)
-        opt = self.optimizer(self.parameters(), lr=self.layer_optim_learning_rate)
-        opt.zero_grad()
+        print(loss)
+        print(self.parameters())
+      # optimizer = self.optimizer(self.parameters(), lr=self.layer_optim_learning_rate)
+        self.optimizer.zero_grad()
         loss.backward()
-        opt.step()
+        self.optimizer.step()
             
         if before:
             return X_pos_out.detach(), X_neg_out.detach(), loss.item()
         else:
             return self.forward(X_pos).detach(), self.forward().detach(), loss.item()
+
+
