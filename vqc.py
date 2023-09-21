@@ -121,7 +121,6 @@ class FF_VQC(tq.QuantumModule):
             self.params_rz_dct[str(i)] = tq.RZ(has_params=True, trainable=True)
             
         self.optimizer = optimizer(self.parameters(), lr=layer_optim_learning_rate)
-        self.layer_optim_learning_rate = layer_optim_learning_rate 
         
         # The observables are Hermitian operator based on Pauli-Z 
         self.measure = tq.MeasureAll(tq.PauliZ)
@@ -177,9 +176,6 @@ class FF_VQC(tq.QuantumModule):
         X_neg_out = self.forward(X_neg, self.dev)
                     
         loss = self.loss_fn(X_pos_out, X_neg_out, self.threshold)
-        print(loss)
-        print(self.parameters())
-      # optimizer = self.optimizer(self.parameters(), lr=self.layer_optim_learning_rate)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -187,6 +183,4 @@ class FF_VQC(tq.QuantumModule):
         if before:
             return X_pos_out.detach(), X_neg_out.detach(), loss.item()
         else:
-            return self.forward(X_pos).detach(), self.forward().detach(), loss.item()
-
-
+            return self.forward(X_pos, self.dev).detach(), self.forward(X_neg, self.dev).detach(), loss.item()
