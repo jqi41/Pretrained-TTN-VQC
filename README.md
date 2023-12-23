@@ -47,4 +47,4 @@ If you use the codes for your research work, please consider citing the followin
 
 [2] Jun Qi, Chao-Han Huck Yang, Pin-Yu Chen, Min-Hsiu Hsieh, "Theoretical Error Performance Analysis for Variational Quantum Circuit Based Functional Regression," Nature Publishing Group, npj Quantum Information, Vol. 9, no. 4, 2023
 
-[3] Jun Qi, Chao-Han Huck Yang, Pin-Yu Chen, "QTN-VQC: An End-to-End Learning Framework for Quantum Neural Networks," Physica Scripta, Vol 9, 015111, 2023.
+[3] Jun Qi, Chao-Han Huck Yang, Pin-Yu Chen, "QTN-VQC: An End-to-End Learning Framework for Quantum Neural Networks," Physica Scripta, Vol 9, no. 1, pp. 015111, 2023.
