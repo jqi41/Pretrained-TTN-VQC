@@ -19,7 +19,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # Torch Quantum
 import torchquantum as tq
-from torchquantum.datasets import MNIST
+from torchquantum.dataset import MNIST
 
 # Tensor Train Network
 from tc.tc_fc import TTLinear 
@@ -39,7 +39,8 @@ class TTN_VQC(nn.Module):
                  tt_shape = [[7, 16, 7], [2, 2, 2]],
                  tt_rank = [1, 2, 2, 1]):
         super(TTN_VQC, self).__init__()
-        self.dev = tq.QuantumDevice(n_wires=n_qubits)
+     #  self.dev = tq.QuantumDevice(n_wires=n_qubits)
+        self.n_qubits = n_qubits
         if use_tt:
             # Using a tensor-train layer
             assert np.prod(tt_shape[1]) == n_qubits
@@ -54,6 +55,7 @@ class TTN_VQC(nn.Module):
         self.post_net = nn.Linear(n_qubits, n_class)
         
     def forward(self, input_features):
+        self.dev = tq.QuantumDevice(n_wires=self.n_qubits, bsz=input_features.shape[0])
         pre_out = self.pre_net(input_features)
         q_in = torch.sigmoid(pre_out) * np.pi / 2.0
         q_out = self.vqc(q_in, self.dev)
@@ -95,7 +97,7 @@ def valid_test(dataflow: dict,
             else:
                 inputs = feed_dict['image'].reshape((-1, args.input_dims))
                 for idx, _input in enumerate(inputs):
-                    if args.noise_kind == 'normal':
+                    if args.noise_kind == 'gauss':
                         inputs[idx, :] = add_normal_noise(_input, args.noise_snr)
                     else:
                         inputs[idx, :] = add_laplace_noise(_input, args.noise_snr)
@@ -129,9 +131,9 @@ if __name__ == "__main__":
                     help='wires per block int static mode')
     parser.add_argument('--input_dims', type=int, default=784,
                     help='input dimensions')
-    parser.add_argument('--digits_of_interest', type=list[int], default=[1, 3],
+    parser.add_argument('--digits_of_interest', type=list[int], default=[2, 4, 6],
                     help='digits of interest')
-    parser.add_argument('--n_class', type=int, default=2,
+    parser.add_argument('--n_class', type=int, default=3,
                     help='number of classes')
     parser.add_argument('--n_qubits', type=int, default=8,
                     help='number of qubits')
@@ -143,12 +145,12 @@ if __name__ == "__main__":
                     help='the tensor-train shape')
     parser.add_argument('--tt_ranks', type=list[int], default=[1, 2, 2, 1], 
                     help='the ranks of tensor-train')
-    parser.add_argument('--add_test_noise', type=bool, default=True, 
+    parser.add_argument('--add_test_noise', type=bool, default=False, 
                     help='whether we add noise to test data')
     parser.add_argument('--noise_snr', type=int, default=6, 
                     help='noise snr level')
     parser.add_argument('--noise_kind', metavar='DIR', default='laplace', 
-                    help='noise kind')
+                    help='noise kind (gauss or laplace)')
 
     args = parser.parse_args()
     
@@ -205,7 +207,6 @@ if __name__ == "__main__":
         
     # test
     valid_test(dataflow, 'test', model, device, args.add_test_noise)
-    
     
     # Saving the TTN-VQC model as a whole
     path = os.path.join(os.path.abspath(''), 'models/model_ttn-vqc.pth')
