@@ -22,7 +22,7 @@ from vqc import VQC
 
 # Torch Quantum
 import torchquantum as tq
-from torchquantum.datasets import MNIST  
+from torchquantum.dataset import MNIST  
 
 from utils import add_normal_noise, add_laplace_noise
 
